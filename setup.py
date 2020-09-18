@@ -20,7 +20,7 @@ except ImportError:
 ## Ensure that ``./autogen.sh`` is run prior to using ``setup.py``
 ##
 
-if "%%short-version%%".startswith("%%"):
+if "3.0.4".startswith("%%"):
     import os.path
     import sys
     WIN32 = sys.platform == 'win32'
@@ -60,6 +60,7 @@ if "%%short-version%%".startswith("%%"):
 
 setup(
     setup_requires=['d2to1'],
+    install_requires=["mako", ],
     extras_require={
         'Mustache': ["pystache", ],
         'Mako': ["mako", ],

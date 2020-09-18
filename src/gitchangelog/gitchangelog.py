@@ -31,7 +31,7 @@ except ImportError:  ## pragma: no cover
     mako = None
 
 
-__version__ = "%%version%%"  ## replaced by autogen.sh
+__version__ = "3.0.4"  ## replaced by autogen.sh
 
 DEBUG = None
 
@@ -1614,7 +1614,7 @@ def versions_data_iter(repository, revlist=None,
         versions_done[tag] = current_version
 
 
-def changelog(output_engine=rest_py,
+def changelog(output_engine=None,
               unreleased_version_label="unreleased",
               warn=warn,        ## Mostly used for test
               **kwargs):
@@ -1763,7 +1763,35 @@ def get_revision(repository, config, opts):
             revs = [eval_if_callable(rev)
                     for rev in revs]
         else:
-            revs = []
+            tags = repository.tags()
+            # Find the last full release
+            rel_tags = [t for t in tags if '-rc' not in t.identifier]
+            if len(rel_tags) == 0:
+                revs = []
+            else:
+                last_rel = f'^{rel_tags[-1].identifier}'
+                rc_tags = [t for t in tags if '-rc' in t.identifier]
+                if len(rc_tags) > 0:
+                    current_rc = rc_tags[-1].identifier.split('-')[0]
+                    revs = [last_rel, 'HEAD']
+                    config['unreleased_version_label'] = current_rc
+                    # return revs
+                else:
+                    #compute the next revision
+                    last_rel_segmented = last_rel.replace('^', '').split('.')
+                    #easy case is new month
+                    if ((int(last_rel_segmented[0]) < datetime.date.today().year) or
+                        (int(last_rel_segmented[0]) == datetime.date.today().year and int(last_rel_segmented[1]) < datetime.date.today().month)):
+                        current_rc = f'{datetime.date.today().year}.{datetime.date.today().month}.1'
+                        revs = [last_rel, 'HEAD']
+                        config['unreleased_version_label'] = current_rc
+                        # return revs
+                    else:
+                        current_rc = f'{last_rel_segmented[0]}.{last_rel_segmented[1]}.{last_rel_segmented[2] + 1}'
+                        revs = [last_rel, 'HEAD']
+                        config['unreleased_version_label'] = current_rc
+                        # return revs
+
 
     for rev in revs:
         if not isinstance(rev, basestring):
@@ -1872,6 +1900,37 @@ def safe_print(content):
 ## Main
 ##
 
+def fill_in_interfaces_defaults(config):
+    config.setdefault('ignore_regexps', [
+        r'@wip', r'!wip',
+        r'^([Mm]eta:)',
+        r'^(.{3,3}\s*:)?\s*[I]nitial commit.?\s*$',
+        r'^$',  ## ignore commits with empty messages
+    ])
+    config.setdefault('section_regexps', [
+        ('Features', [
+            r'^([jJ]ira|[qQ][aA]):([^\n]*)$',
+         ]),
+        ('Technical', [
+            r'^[dD]ev:([^\n]*)$',
+         ]),
+        ('Operations', [
+            r'^[oO]ps:([^\n]*)$',
+         ]),
+        ('Other', None ## Match all lines
+         ),
+    ])
+    config.setdefault('body_process', ReSub(r'((^|\n)[A-Z]\w+(-\w+)*: .*(\n\s+.*)*)+$', r'') | strip)
+    config.setdefault('subject_process',  (strip |
+        ReSub(r'^([Dd]ev|[Qq][Aa]|[Jj]ira|[Oo]ps):([^\n@]*)(@[a-z]+\s+)*$', r'\2') |
+        SetIfEmpty("No commit message.") | ucfirst | final_dot))
+    config.setdefault('tag_filter_regexp', r'^[0-9]+\.[0-9]+\.[0-9]+$')
+    config.setdefault('unreleased_version_label', 'unreleased')
+    config.setdefault('output_engine',  makotemplate("InterfacesMarkdown"))
+    config.setdefault('include_merge', False)
+    return config
+
+
 def main():
 
     global DEBUG
@@ -1941,10 +2000,14 @@ def main():
 
     config = load_config_file(
         os.path.expanduser(changelogrc),
-        default_filename=reference_config,
+        default_filename=None, ## changing this to use our custom fallbacks
         fail_if_not_present=False)
 
     config = Config(config)
+
+    ## Stuff for interfaces.  Done in code to make it more portable than loading a file/env vars.
+    config = fill_in_interfaces_defaults(config)
+
 
     log_encoding = get_log_encoding(repository, config)
     revlist = get_revision(repository, config, opts)
@@ -1959,7 +2022,7 @@ def main():
             section_regexps=config['section_regexps'],
             unreleased_version_label=config['unreleased_version_label'],
             tag_filter_regexp=config['tag_filter_regexp'],
-            output_engine=config.get("output_engine", rest_py),
+            output_engine=config.get("output_engine", None),
             include_merge=config.get("include_merge", True),
             body_process=config.get("body_process", noop),
             subject_process=config.get("subject_process", noop),
