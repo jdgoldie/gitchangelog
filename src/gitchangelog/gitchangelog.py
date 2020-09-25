@@ -1769,28 +1769,27 @@ def get_revision(repository, config, opts):
             if len(rel_tags) == 0:
                 revs = []
             else:
-                last_rel = f'^{rel_tags[-1].identifier}'
-                rc_tags = [t for t in tags if '-rc' in t.identifier]
+                last_rel = rel_tags[-1].identifier
+                last_rel_filter = f'^{last_rel}'
+                rc_tags = [t.identifier.split('-')[0] for t in tags if '-rc' in t.identifier]
+                rc_tags = [t for t in rc_tags if t > last_rel]
                 if len(rc_tags) > 0:
-                    current_rc = rc_tags[-1].identifier.split('-')[0]
-                    revs = [last_rel, 'HEAD']
+                    current_rc = rc_tags[-1]
+                    revs = [last_rel_filter, 'HEAD']
                     config['unreleased_version_label'] = current_rc
-                    # return revs
                 else:
                     #compute the next revision
-                    last_rel_segmented = last_rel.replace('^', '').split('.')
+                    last_rel_segmented = last_rel_filter.replace('^', '').split('.')
                     #easy case is new month
                     if ((int(last_rel_segmented[0]) < datetime.date.today().year) or
                         (int(last_rel_segmented[0]) == datetime.date.today().year and int(last_rel_segmented[1]) < datetime.date.today().month)):
                         current_rc = f'{datetime.date.today().year}.{datetime.date.today().month}.1'
-                        revs = [last_rel, 'HEAD']
+                        revs = [last_rel_filter, 'HEAD']
                         config['unreleased_version_label'] = current_rc
-                        # return revs
                     else:
                         current_rc = f'{last_rel_segmented[0]}.{last_rel_segmented[1]}.{last_rel_segmented[2] + 1}'
-                        revs = [last_rel, 'HEAD']
+                        revs = [last_rel_filter, 'HEAD']
                         config['unreleased_version_label'] = current_rc
-                        # return revs
 
 
     for rev in revs:
