@@ -1787,7 +1787,7 @@ def get_revision(repository, config, opts):
                         revs = [last_rel_filter, 'HEAD']
                         config['unreleased_version_label'] = current_rc
                     else:
-                        current_rc = f'{last_rel_segmented[0]}.{last_rel_segmented[1]}.{last_rel_segmented[2] + 1}'
+                        current_rc = f'{last_rel_segmented[0]}.{last_rel_segmented[1]}.{int(last_rel_segmented[2]) + 1}'
                         revs = [last_rel_filter, 'HEAD']
                         config['unreleased_version_label'] = current_rc
 
